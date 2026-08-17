@@ -22,18 +22,6 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Normalize logo PNG without changing pixels
-        run: |
-          python -m pip install --disable-pip-version-check pillow
-          python - <<'PY'
-          from PIL import Image
-          from pathlib import Path
-          p = Path('app/src/main/res/drawable/app_icon.png')
-          im = Image.open(p).convert('RGBA')
-          im.save(p, format='PNG', compress_level=1)
-          print('logo', im.size, im.mode)
-          PY
-
       - name: Android SDK
         uses: android-actions/setup-android@v3
 
