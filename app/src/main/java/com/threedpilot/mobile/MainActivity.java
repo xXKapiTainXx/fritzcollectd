@@ -25,17 +25,24 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
+
 public class MainActivity extends Activity {
     private static final String PREFS = "3d_pilot";
     private static final String KEY_SERVER = "server_ip";
     private static final int DEFAULT_PORT = 17888;
 
+    private LinearLayout root;
     private LinearLayout startPanel;
+    private LinearLayout appBar;
     private EditText serverEdit;
     private TextView statusText;
+    private TextView appVpnText;
     private FrameLayout webContainer;
     private WebView webView;
     private SharedPreferences prefs;
+    private String mobileScript;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -44,6 +51,7 @@ public class MainActivity extends Activity {
             buildInterface();
             prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
             serverEdit.setText(prefs.getString(KEY_SERVER, ""));
+            mobileScript = readAssetText("mobile.js");
             initWebViewSafe();
             updateVpnStatus();
         } catch (Throwable error) {
@@ -52,10 +60,9 @@ public class MainActivity extends Activity {
     }
 
     private void buildInterface() {
-        LinearLayout root = new LinearLayout(this);
+        root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(Color.WHITE);
-        root.setPadding(dp(24), dp(24), dp(24), dp(24));
+        root.setBackgroundColor(Color.rgb(244, 246, 248));
         root.setLayoutParams(new ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT));
@@ -64,6 +71,7 @@ public class MainActivity extends Activity {
         startPanel = new LinearLayout(this);
         startPanel.setOrientation(LinearLayout.VERTICAL);
         startPanel.setGravity(Gravity.CENTER_HORIZONTAL);
+        startPanel.setPadding(dp(24), dp(24), dp(24), dp(24));
         root.addView(startPanel, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT));
@@ -80,7 +88,7 @@ public class MainActivity extends Activity {
         startPanel.addView(title, titleParams);
 
         ImageView logo = new ImageView(this);
-        logo.setImageResource(com.threedpilot.mobile.R.drawable.app_icon);
+        logo.setImageResource(R.drawable.app_icon);
         logo.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
         LinearLayout.LayoutParams logoParams = new LinearLayout.LayoutParams(dp(170), dp(170));
         logoParams.bottomMargin = dp(20);
@@ -123,11 +131,71 @@ public class MainActivity extends Activity {
         startPanel.addView(statusText, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
+        buildAppBar();
+
         webContainer = new FrameLayout(this);
         webContainer.setVisibility(View.GONE);
         LinearLayout.LayoutParams webParams = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f);
         root.addView(webContainer, webParams);
+    }
+
+    private void buildAppBar() {
+        appBar = new LinearLayout(this);
+        appBar.setOrientation(LinearLayout.HORIZONTAL);
+        appBar.setGravity(Gravity.CENTER_VERTICAL);
+        appBar.setPadding(dp(8), dp(5), dp(8), dp(5));
+        appBar.setBackgroundColor(Color.rgb(17, 25, 35));
+        appBar.setVisibility(View.GONE);
+        root.addView(appBar, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(58)));
+
+        TextView menu = new TextView(this);
+        menu.setText("☰");
+        menu.setTextColor(Color.WHITE);
+        menu.setTextSize(27f);
+        menu.setGravity(Gravity.CENTER);
+        menu.setContentDescription("Menü");
+        menu.setOnClickListener(v -> toggleMobileMenu());
+        appBar.addView(menu, new LinearLayout.LayoutParams(dp(46), dp(46)));
+
+        ImageView smallLogo = new ImageView(this);
+        smallLogo.setImageResource(R.drawable.app_icon);
+        smallLogo.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        LinearLayout.LayoutParams smallLogoParams = new LinearLayout.LayoutParams(dp(38), dp(38));
+        smallLogoParams.leftMargin = dp(4);
+        smallLogoParams.rightMargin = dp(8);
+        appBar.addView(smallLogo, smallLogoParams);
+
+        TextView appTitle = new TextView(this);
+        appTitle.setText("3D Pilot");
+        appTitle.setTextColor(Color.WHITE);
+        appTitle.setTextSize(20f);
+        appTitle.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+        appBar.addView(appTitle, new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        appVpnText = new TextView(this);
+        appVpnText.setTextSize(12f);
+        appVpnText.setGravity(Gravity.CENTER);
+        appVpnText.setPadding(dp(7), dp(4), dp(7), dp(4));
+        appBar.addView(appVpnText, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        TextView reload = new TextView(this);
+        reload.setText("↻");
+        reload.setTextColor(Color.WHITE);
+        reload.setTextSize(27f);
+        reload.setGravity(Gravity.CENTER);
+        reload.setContentDescription("Neu laden");
+        reload.setOnClickListener(v -> {
+            try {
+                if (webView != null && isVpnActive()) webView.reload();
+            } catch (Throwable ignored) { }
+        });
+        LinearLayout.LayoutParams reloadParams = new LinearLayout.LayoutParams(dp(44), dp(44));
+        reloadParams.leftMargin = dp(5);
+        appBar.addView(reload, reloadParams);
     }
 
     private void initWebViewSafe() {
@@ -139,6 +207,8 @@ public class MainActivity extends Activity {
             settings.setLoadsImagesAutomatically(true);
             settings.setUseWideViewPort(true);
             settings.setLoadWithOverviewMode(false);
+            settings.setBuiltInZoomControls(false);
+            settings.setDisplayZoomControls(false);
 
             CookieManager cookies = CookieManager.getInstance();
             cookies.setAcceptCookie(true);
@@ -170,6 +240,10 @@ public class MainActivity extends Activity {
                 @Override
                 public void onPageFinished(WebView view, String url) {
                     super.onPageFinished(view, url);
+                    if (isVpnActive()) {
+                        applyMobileView(view);
+                        updateVpnStatus();
+                    }
                 }
             });
 
@@ -198,16 +272,16 @@ public class MainActivity extends Activity {
 
             if (webView == null) {
                 initWebViewSafe();
-                if (webView == null) {
-                    return;
-                }
+                if (webView == null) return;
             }
 
             String loginUrl = buildLoginUrl(raw);
             prefs.edit().putString(KEY_SERVER, raw).apply();
             statusText.setText("");
             startPanel.setVisibility(View.GONE);
+            appBar.setVisibility(View.VISIBLE);
             webContainer.setVisibility(View.VISIBLE);
+            updateVpnStatus();
             webView.loadUrl(loginUrl);
         } catch (Throwable error) {
             showStartPanel("Verbindung konnte nicht geöffnet werden: " + safeMessage(error));
@@ -216,24 +290,18 @@ public class MainActivity extends Activity {
 
     private String buildLoginUrl(String raw) {
         String value = raw.trim();
-        if (!value.contains("://")) {
-            value = "http://" + value;
-        }
+        if (!value.contains("://")) value = "http://" + value;
 
         Uri parsed = Uri.parse(value);
         String scheme = parsed.getScheme();
         String host = parsed.getHost();
         int port = parsed.getPort();
 
-        if (scheme == null || scheme.length() == 0) {
-            scheme = "http";
-        }
+        if (scheme == null || scheme.length() == 0) scheme = "http";
         if (host == null || host.length() == 0) {
             throw new IllegalArgumentException("Ungültige Server-IP");
         }
-        if (port < 0) {
-            port = DEFAULT_PORT;
-        }
+        if (port < 0) port = DEFAULT_PORT;
         return scheme + "://" + host + ":" + port + "/login";
     }
 
@@ -249,16 +317,49 @@ public class MainActivity extends Activity {
                     return true;
                 }
             }
-        } catch (Throwable ignored) {
-        }
+        } catch (Throwable ignored) { }
         return false;
     }
 
     private void updateVpnStatus() {
-        if (isVpnActive()) {
-            setStatus("VPN aktiv");
-        } else {
-            setStatus("VPN nicht aktiv");
+        boolean active = isVpnActive();
+        if (startPanel != null && startPanel.getVisibility() == View.VISIBLE) {
+            statusText.setText(active ? "✓ VPN aktiv" : "VPN nicht aktiv");
+            statusText.setTextColor(active ? Color.rgb(31, 143, 71) : Color.rgb(180, 55, 55));
+        }
+        if (appVpnText != null) {
+            appVpnText.setText(active ? "VPN ✓" : "VPN ✕");
+            appVpnText.setTextColor(active ? Color.rgb(157, 231, 176) : Color.rgb(255, 165, 165));
+        }
+    }
+
+    private void applyMobileView(WebView view) {
+        try {
+            if (mobileScript != null && mobileScript.length() > 0) {
+                view.evaluateJavascript(mobileScript, null);
+            }
+        } catch (Throwable ignored) { }
+    }
+
+    private void toggleMobileMenu() {
+        try {
+            if (webView != null) {
+                webView.evaluateJavascript(
+                        "(function(){if(window.__threeDPilotToggleMenu){window.__threeDPilotToggleMenu();}})();",
+                        null);
+            }
+        } catch (Throwable ignored) { }
+    }
+
+    private String readAssetText(String name) {
+        try (InputStream input = getAssets().open(name);
+             ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            byte[] buffer = new byte[4096];
+            int count;
+            while ((count = input.read(buffer)) > 0) output.write(buffer, 0, count);
+            return output.toString("UTF-8");
+        } catch (Throwable ignored) {
+            return "";
         }
     }
 
@@ -267,6 +368,7 @@ public class MainActivity extends Activity {
             if (webView != null) webView.stopLoading();
         } catch (Throwable ignored) { }
         if (webContainer != null) webContainer.setVisibility(View.GONE);
+        if (appBar != null) appBar.setVisibility(View.GONE);
         if (startPanel != null) startPanel.setVisibility(View.VISIBLE);
         setStatus(message);
     }
@@ -299,8 +401,7 @@ public class MainActivity extends Activity {
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.WRAP_CONTENT));
             setContentView(emergency);
-        } catch (Throwable ignored) {
-        }
+        } catch (Throwable ignored) { }
     }
 
     private String safeMessage(Throwable error) {
@@ -320,11 +421,10 @@ public class MainActivity extends Activity {
         try {
             if (webContainer != null && webContainer.getVisibility() == View.VISIBLE && !isVpnActive()) {
                 showStartPanel("VPN nicht aktiv. Verbindung wurde gesperrt.");
-            } else if (startPanel != null && startPanel.getVisibility() == View.VISIBLE) {
+            } else {
                 updateVpnStatus();
             }
-        } catch (Throwable ignored) {
-        }
+        } catch (Throwable ignored) { }
     }
 
     @Override
@@ -334,12 +434,11 @@ public class MainActivity extends Activity {
                 if (webView != null && webView.canGoBack()) {
                     webView.goBack();
                 } else {
-                    showStartPanel(isVpnActive() ? "VPN aktiv" : "VPN nicht aktiv");
+                    showStartPanel(isVpnActive() ? "✓ VPN aktiv" : "VPN nicht aktiv");
                 }
                 return;
             }
-        } catch (Throwable ignored) {
-        }
+        } catch (Throwable ignored) { }
         super.onBackPressed();
     }
 
@@ -350,8 +449,7 @@ public class MainActivity extends Activity {
                 webView.stopLoading();
                 webView.destroy();
             }
-        } catch (Throwable ignored) {
-        }
+        } catch (Throwable ignored) { }
         super.onDestroy();
     }
 }
