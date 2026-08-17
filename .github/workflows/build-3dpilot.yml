@@ -42,7 +42,7 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
-      - name: Emulator startup diagnostic test
+      - name: Emulator startup smoke test
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35
@@ -58,24 +58,9 @@ jobs:
             adb shell am force-stop com.threedpilot.mobile
             adb shell am start -W -n com.threedpilot.mobile/.MainActivity
             sleep 5
-            echo '===== 3D PILOT PID ====='
-            PID=$(adb shell pidof com.threedpilot.mobile | tr -d '\r' || true)
-            echo "PID=$PID"
-            echo '===== CRASH BUFFER ====='
-            adb logcat -d -b crash || true
-            echo '===== APP LOGCAT ====='
-            adb logcat -d -v threadtime | grep -E 'com\.threedpilot\.mobile|AndroidRuntime|FATAL EXCEPTION|WebView|chromium' | tail -n 300 || true
-            echo '===== ACTIVITY STATE ====='
-            adb shell dumpsys activity activities | grep -F 'com.threedpilot.mobile' || true
-            if [ -z "$PID" ]; then
-              echo '3D Pilot process exited after launch'
-              exit 1
-            fi
-            if adb logcat -d -b crash | grep -F 'com.threedpilot.mobile'; then
-              echo 'Crash log detected for 3D Pilot'
-              exit 1
-            fi
-            echo "3D Pilot process alive: $PID"
+            adb shell dumpsys activity activities | grep -F 'com.threedpilot.mobile/.MainActivity'
+            ! adb logcat -d -b crash | grep -F 'com.threedpilot.mobile'
+            echo '3D Pilot startup smoke test passed'
 
       - name: Upload unsigned APK
         uses: actions/upload-artifact@v4
