@@ -33,8 +33,38 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Build release APK
-        run: gradle --no-daemon :app:assembleRelease
+      - name: Build release and debug APKs
+        run: gradle --no-daemon :app:assembleRelease :app:assembleDebug
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Emulator startup smoke test
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_7
+          disable-animations: true
+          force-avd-creation: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none -no-snapshot-save
+          script: |
+            adb install -r app/build/outputs/apk/debug/app-debug.apk
+            adb shell am force-stop com.threedpilot.mobile
+            adb shell am start -W -n com.threedpilot.mobile/.MainActivity
+            sleep 5
+            PID=$(adb shell pidof com.threedpilot.mobile | tr -d '\r')
+            test -n "$PID"
+            adb shell dumpsys activity activities | grep -F 'com.threedpilot.mobile/.MainActivity'
+            if adb logcat -d -b crash | grep -F 'com.threedpilot.mobile'; then
+              echo 'Crash log detected for 3D Pilot'
+              exit 1
+            fi
+            echo "3D Pilot process alive: $PID"
 
       - name: Upload unsigned APK
         uses: actions/upload-artifact@v4
