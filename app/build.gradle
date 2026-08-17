@@ -1,0 +1,22 @@
+plugins {
+    id "com.android.application"
+}
+
+android {
+    namespace "com.threedpilot.mobile"
+    compileSdk 35
+
+    defaultConfig {
+        applicationId "com.threedpilot.mobile"
+        minSdk 26
+        targetSdk 28
+        versionCode 357
+        versionName "3.57"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+        }
+    }
+}
