@@ -42,7 +42,7 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
-      - name: Emulator startup smoke test
+      - name: Emulator startup and UI smoke test
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35
@@ -59,12 +59,15 @@ jobs:
             adb shell am start -W -n com.threedpilot.mobile/.MainActivity
             sleep 5
             adb shell dumpsys activity activities | grep -F 'com.threedpilot.mobile/.MainActivity'
+            adb shell uiautomator dump /sdcard/3dpilot-ui.xml >/dev/null
+            adb shell cat /sdcard/3dpilot-ui.xml | grep -F '3D Pilot'
+            adb shell cat /sdcard/3dpilot-ui.xml | grep -F 'Verbinden'
             ! adb logcat -d -b crash | grep -F 'com.threedpilot.mobile'
-            echo '3D Pilot startup smoke test passed'
+            echo '3D Pilot 3.58 startup and UI smoke test passed'
 
       - name: Upload unsigned APK
         uses: actions/upload-artifact@v4
         with:
-          name: 3d-pilot-v3.57-unsigned
+          name: 3d-pilot-v3.58-unsigned
           path: app/build/outputs/apk/release/app-release-unsigned.apk
           if-no-files-found: error
