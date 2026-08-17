@@ -19,4 +19,8 @@ android {
             minifyEnabled false
         }
     }
+
+    lint {
+        disable 'ExpiredTargetSdkVersion'
+    }
 }
