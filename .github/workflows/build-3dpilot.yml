@@ -41,11 +41,18 @@ jobs:
         run: |
           grep -F "versionName '3.59'" app/build.gradle
           grep -F "com.sumup:merchant-sdk:7.1.0" app/build.gradle
+          grep -F "compose-bom:2026.05.01" app/build.gradle
           grep -F 'ThreeDPilotSumUp' app/src/main/java/com/threedpilot/mobile/MainActivity.java
           grep -F 'SumUpState.init(this)' app/src/main/java/com/threedpilot/mobile/PilotApplication.java
 
       - name: Build debug APK
         run: gradle --no-daemon :app:assembleDebug --stacktrace
+
+      - name: Verify APK signature and package
+        run: |
+          APK=app/build/outputs/apk/debug/app-debug.apk
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$APK"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt2" dump badging "$APK" | grep -E "package:|application-label:|launchable-activity:"
 
       - name: Enable KVM
         run: |
