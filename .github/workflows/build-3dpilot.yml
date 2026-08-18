@@ -35,13 +35,18 @@ jobs:
           gradle-version: '9.4.1'
 
       - name: Apply SumUp Air Java sources
-        run: python ci-v359-patch.py
+        run: |
+          python ci-v359-patch.py
+          sed -i 's/com\.sumup\.merchant\.reader\.models\.SumUpLogin/com.sumup.merchant.reader.api.SumUpLogin/' app/src/main/java/com/threedpilot/mobile/MainActivity.java
+          sed -i 's/com\.sumup\.merchant\.reader\.models\.SumUpPayment/com.sumup.merchant.reader.api.SumUpPayment/' app/src/main/java/com/threedpilot/mobile/MainActivity.java
 
       - name: Verify v3.59 source markers
         run: |
           grep -F "versionName '3.59'" app/build.gradle
           grep -F "com.sumup:merchant-sdk:7.1.0" app/build.gradle
           grep -F "compose-bom:2026.05.01" app/build.gradle
+          grep -F 'com.sumup.merchant.reader.api.SumUpLogin' app/src/main/java/com/threedpilot/mobile/MainActivity.java
+          grep -F 'com.sumup.merchant.reader.api.SumUpPayment' app/src/main/java/com/threedpilot/mobile/MainActivity.java
           grep -F 'ThreeDPilotSumUp' app/src/main/java/com/threedpilot/mobile/MainActivity.java
           grep -F 'SumUpState.init(this)' app/src/main/java/com/threedpilot/mobile/PilotApplication.java
 
