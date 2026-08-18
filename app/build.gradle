@@ -32,6 +32,8 @@ android {
 }
 
 dependencies {
+    implementation platform('androidx.compose:compose-bom:2026.05.01')
     implementation 'com.sumup:merchant-sdk:7.1.0'
+    implementation 'com.google.android.gms:play-services-location:21.3.0'
     coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.5'
 }
