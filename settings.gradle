@@ -10,7 +10,8 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        maven { url 'https://maven.sumup.com/releases' }
     }
 }
-rootProject.name = "3DPilot"
-include(":app")
+rootProject.name = '3DPilot'
+include ':app'
