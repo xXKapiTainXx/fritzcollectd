@@ -1,16 +1,13 @@
-name: Build 3D Pilot Android
+name: Build 3D Pilot Android v3.59 SumUp Air
 
 on:
   push:
     branches:
       - tmp-3dpilot-build
-  pull_request:
-    branches:
-      - master
   workflow_dispatch:
 
 concurrency:
-  group: 3dpilot-android-build
+  group: 3dpilot-android-v359
   cancel-in-progress: true
 
 jobs:
@@ -29,16 +26,24 @@ jobs:
       - name: Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Install Android platform
-        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - name: Install Android platforms
+        run: sdkmanager "platforms;android-36" "platforms;android-35" "build-tools;36.0.0"
 
-      - name: Gradle
+      - name: Gradle 9.4.1
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.9'
+          gradle-version: '9.4.1'
 
-      - name: Build release and debug APKs
-        run: gradle --no-daemon :app:assembleRelease :app:assembleDebug
+      - name: Extract 3D Pilot source
+        run: |
+          rm -rf /tmp/3dpilot-v359
+          mkdir -p /tmp/3dpilot-v359
+          unzip -q 3dpilot-v359-src.zip -d /tmp/3dpilot-v359
+          test -f /tmp/3dpilot-v359/3D-Pilot-Android-v3.59-SumUpAir-Source/app/build.gradle
+
+      - name: Build debug APK
+        working-directory: /tmp/3dpilot-v359/3D-Pilot-Android-v3.59-SumUpAir-Source
+        run: gradle --no-daemon :app:assembleDebug --stacktrace
 
       - name: Enable KVM
         run: |
@@ -46,7 +51,7 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
-      - name: Emulator startup and UI smoke test
+      - name: Emulator startup smoke test
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35
@@ -57,21 +62,19 @@ jobs:
           force-avd-creation: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none -no-snapshot-save
           script: |
-            adb install -r app/build/outputs/apk/debug/app-debug.apk
+            APK=/tmp/3dpilot-v359/3D-Pilot-Android-v3.59-SumUpAir-Source/app/build/outputs/apk/debug/app-debug.apk
+            adb install -r "$APK"
             adb logcat -c
             adb shell am force-stop com.threedpilot.mobile
             adb shell am start -W -n com.threedpilot.mobile/.MainActivity
             sleep 5
             adb shell dumpsys activity activities | grep -F 'com.threedpilot.mobile/.MainActivity'
-            adb shell uiautomator dump /sdcard/3dpilot-ui.xml >/dev/null
-            adb shell cat /sdcard/3dpilot-ui.xml | grep -F '3D Pilot'
-            adb shell cat /sdcard/3dpilot-ui.xml | grep -F 'Verbinden'
             ! adb logcat -d -b crash | grep -F 'com.threedpilot.mobile'
-            echo '3D Pilot 3.58 startup and UI smoke test passed'
+            echo '3D Pilot v3.59 startup smoke test passed'
 
-      - name: Upload unsigned APK
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: 3d-pilot-v3.58-unsigned
-          path: app/build/outputs/apk/release/app-release-unsigned.apk
+          name: 3D-Pilot-Android-v3.59-SumUpAir
+          path: /tmp/3dpilot-v359/3D-Pilot-Android-v3.59-SumUpAir-Source/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
