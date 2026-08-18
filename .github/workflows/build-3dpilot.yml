@@ -55,9 +55,8 @@ jobs:
 
       - name: Verify APK signature and package
         run: |
-          APK=app/build/outputs/apk/debug/app-debug.apk
-          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$APK"
-          "$ANDROID_HOME/build-tools/36.0.0/aapt2" dump badging "$APK" | grep -E "package:|application-label:|launchable-activity:"
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs app/build/outputs/apk/debug/app-debug.apk
+          "$ANDROID_HOME/build-tools/36.0.0/aapt2" dump badging app/build/outputs/apk/debug/app-debug.apk | grep -E "package:|application-label:|launchable-activity:"
 
       - name: Enable KVM
         run: |
@@ -76,8 +75,7 @@ jobs:
           force-avd-creation: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none -no-snapshot-save
           script: |
-            APK=app/build/outputs/apk/debug/app-debug.apk
-            adb install -r "$APK"
+            adb install -r app/build/outputs/apk/debug/app-debug.apk
             adb logcat -c
             adb shell am force-stop com.threedpilot.mobile
             adb shell am start -W -n com.threedpilot.mobile/.MainActivity
