@@ -1,9 +1,6 @@
 name: Build 3D Pilot Android v3.59 SumUp Air
 
 on:
-  push:
-    branches:
-      - tmp-3dpilot-build
   pull_request:
     branches:
       - master
@@ -37,15 +34,17 @@ jobs:
         with:
           gradle-version: '9.4.1'
 
-      - name: Extract 3D Pilot source
+      - name: Apply SumUp Air Java sources
+        run: python ci-v359-patch.py
+
+      - name: Verify v3.59 source markers
         run: |
-          rm -rf /tmp/3dpilot-v359
-          mkdir -p /tmp/3dpilot-v359
-          unzip -q 3dpilot-v359-src.zip -d /tmp/3dpilot-v359
-          test -f /tmp/3dpilot-v359/3D-Pilot-Android-v3.59-SumUpAir-Source/app/build.gradle
+          grep -F "versionName '3.59'" app/build.gradle
+          grep -F "com.sumup:merchant-sdk:7.1.0" app/build.gradle
+          grep -F 'ThreeDPilotSumUp' app/src/main/java/com/threedpilot/mobile/MainActivity.java
+          grep -F 'SumUpState.init(this)' app/src/main/java/com/threedpilot/mobile/PilotApplication.java
 
       - name: Build debug APK
-        working-directory: /tmp/3dpilot-v359/3D-Pilot-Android-v3.59-SumUpAir-Source
         run: gradle --no-daemon :app:assembleDebug --stacktrace
 
       - name: Enable KVM
@@ -65,7 +64,7 @@ jobs:
           force-avd-creation: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none -no-snapshot-save
           script: |
-            APK=/tmp/3dpilot-v359/3D-Pilot-Android-v3.59-SumUpAir-Source/app/build/outputs/apk/debug/app-debug.apk
+            APK=app/build/outputs/apk/debug/app-debug.apk
             adb install -r "$APK"
             adb logcat -c
             adb shell am force-stop com.threedpilot.mobile
@@ -79,5 +78,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: 3D-Pilot-Android-v3.59-SumUpAir
-          path: /tmp/3dpilot-v359/3D-Pilot-Android-v3.59-SumUpAir-Source/app/build/outputs/apk/debug/app-debug.apk
+          path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
